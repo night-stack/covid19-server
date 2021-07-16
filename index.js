@@ -7,7 +7,7 @@ const bcrypt = require("bcrypt");
 const db = mysql.createPool({
   host: "localhost",
   user: "root",
-  password: "",
+  password: "12345",
   database: "covid19",
 });
 
@@ -250,6 +250,53 @@ app.post("/api/auth/register", async (req, res) => {
     db.query(query, [body.name, body.email, hash], (err, result) => {
       res.send(result);
     });
+  } catch {
+    res.status(500).send();
+  }
+});
+
+app.post("/api/auth/social", async (req, res) => {
+  try {
+    const body = req.body;
+    let user = null;
+    if (!body.email) {
+      return res.status(400).send({ error: "Data not formatted properly" });
+    }
+    if (body.image) {
+      const query = "INSERT INTO member (foto_profil) VALUES ? WHERE email = ?";
+      db.query(query, [body.email, body.image], (err, result) => {
+        console.log(result);
+      });
+    }
+    const checkUser = "SELECT * FROM member WHERE email = ?";
+    db.query(checkUser, body.email, (err, result) => {
+      user = result[0];
+    });
+    if (!user) {
+      const query =
+        "INSERT INTO member (nama_member, email,foto_profil) VALUES (?,?,?)";
+      db.query(query, [body.name, body.email, body.image], (err, result) => {
+        if (result[0]) {
+          const data =
+            "SELECT id_member, email, nama_member FROM member WHERE email = ?";
+          db.query(data, [body.email], async (err, result) => {
+            res.status(200).json({
+              authUser: { ...result[0], role: "user" },
+              message: "Success",
+            });
+          });
+        }
+      });
+    } else {
+      const data =
+        "SELECT id_member, email, nama_member FROM member WHERE email = ?";
+      db.query(data, [body.email], async (err, result) => {
+        res.status(200).json({
+          authUser: { ...result[0], role: "user" },
+          message: "Success",
+        });
+      });
+    }
   } catch {
     res.status(500).send();
   }
