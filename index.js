@@ -8,6 +8,7 @@ const db = mysql.createPool({
   host: "localhost",
   user: "root",
   database: "covid19",
+  connectionLimit: 100,
 });
 
 app.use(cors());
@@ -61,7 +62,7 @@ app.put("/api/member/edit/:id", async (req, res) => {
   const { name, phone, gender, place, date, address, email } = req.body;
   const id = req.params.id;
   const query =
-    "UPDATE SET member nama_member = ?, jenis_kelamin = ?, tempat_lahir = ?, tanggal_lahir = ?, alamat = ?, email = ?, nomor_hp = ? WHERE id_member = '" +
+    "UPDATE member SET nama_member = ?, jenis_kelamin = ?, tempat_lahir = ?, tanggal_lahir = ?, alamat = ?, email = ?, nomor_hp = ? WHERE id_member = '" +
     id +
     "'";
   db.query(
@@ -76,7 +77,7 @@ app.put("/api/member/edit/:id", async (req, res) => {
 app.put("/api/member/status/:id", (req, res) => {
   const { status } = req.body;
   const id = req.params.id;
-  const query = "UPDATE SET member status = ? WHERE id_member = '" + id + "'";
+  const query = "UPDATE member SET status = ? WHERE id_member = '" + id + "'";
   db.query(query, status, (err, result) => {
     res.send(result);
   });
@@ -85,9 +86,17 @@ app.put("/api/member/status/:id", (req, res) => {
 app.put("/api/member/img-profile/:id", (req, res) => {
   const { image } = req.body;
   const id = req.params.id;
-  const query =
-    "UPDATE SET member foto_profil = ? WHERE id_member = '" + id + "'";
-  db.query(query, image, (err, result) => {
+  const query = "UPDATE member SET foto_profil = ? WHERE id_member = ?";
+  db.query(query, [image, id], (err, result) => {
+    res.send(result);
+  });
+});
+
+app.put("/api/admin/img-profile/:id", (req, res) => {
+  const { image } = req.body;
+  const id = req.params.id;
+  const query = "UPDATE admin SET foto_profil = ? WHERE id_admin = ?";
+  db.query(query, [image, id], (err, result) => {
     res.send(result);
   });
 });
@@ -120,7 +129,7 @@ app.put("/api/history/edit/:id", (req, res) => {
   const { date, result, percent, status } = req.body;
   const id = req.params.id;
   const query =
-    "UPDATE SET riwayat tanggal_diagnosis = ?, hasil_diagnosis = ?, persentase_diagnosis = ?, status_pasien = ? WHERE id_riwayat = '" +
+    "UPDATE riwayat SET tanggal_diagnosis = ?, hasil_diagnosis = ?, persentase_diagnosis = ?, status_pasien = ? WHERE id_riwayat = '" +
     id +
     "'";
   db.query(query, [date, result, percent, status], (err, result) => {
@@ -162,7 +171,7 @@ app.put("/api/diagnosis/edit/:id", (req, res) => {
   const { date, result, percent, status } = req.body;
   const id = req.params.id;
   const query =
-    "UPDATE SET diagnosis pertanyaan = ?, hasil_diagnosis = ? WHERE id_diagnosis = '" +
+    "UPDATE diagnosis SET pertanyaan = ?, hasil_diagnosis = ? WHERE id_diagnosis = '" +
     id +
     "'";
   db.query(query, [date, result, percent, status], (err, result) => {
@@ -216,7 +225,7 @@ app.put("/api/admin/edit/:id", (req, res) => {
   const { name, phone, gender, place, date, address, email } = req.body;
   const id = req.params.id;
   const query =
-    "UPDATE SET admin nama_admin = ?, jenis_kelamin = ?, tempat_lahir = ?, tanggal_lahir = ?, alamat = ?, email = ?, nomor_hp = ? WHERE id_admin = '" +
+    "UPDATE admin SET nama_admin = ?, jenis_kelamin = ?, tempat_lahir = ?, tanggal_lahir = ?, alamat = ?, email = ?, nomor_hp = ? WHERE id_admin = '" +
     id +
     "'";
   db.query(
@@ -241,13 +250,23 @@ app.post("/api/auth/register", async (req, res) => {
         console.log(result);
       });
     }
-
-    // generate salt to hash password
-    const hash = await bcrypt.hash(body.password, 10);
-    const query =
-      "INSERT INTO member (nama_member, email, password) VALUES (?,?,?)";
-    db.query(query, [body.name, body.email, hash], (err, result) => {
-      res.send(result);
+    const checkUser = "SELECT * FROM member WHERE email = ?";
+    db.query(checkUser, body.email, async (err, result) => {
+      try {
+        if (result[0]) {
+          // generate salt to hash password
+          const hash = await bcrypt.hash(body.password, 10);
+          const query =
+            "INSERT INTO member (nama_member, email, password) VALUES (?,?,?)";
+          db.query(query, [body.name, body.email, hash], (err, result) => {
+            res.send(result);
+          });
+        } else {
+          res.status(409).json({ message: "User already exist" });
+        }
+      } catch {
+        res.status(409).json({ message: "User already exist" });
+      }
     });
   } catch {
     res.status(500).send();
@@ -257,7 +276,6 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/social", async (req, res) => {
   try {
     const body = req.body;
-    let user = null;
     if (!body.email) {
       return res.status(400).send({ error: "Data not formatted properly" });
     }
@@ -269,33 +287,35 @@ app.post("/api/auth/social", async (req, res) => {
     }
     const checkUser = "SELECT * FROM member WHERE email = ?";
     db.query(checkUser, body.email, (err, result) => {
-      user = result[0];
-    });
-    if (!user) {
-      const query =
-        "INSERT INTO member (nama_member, email,foto_profil) VALUES (?,?,?)";
-      db.query(query, [body.name, body.email, body.image], (err, result) => {
-        if (result[0]) {
-          const data =
-            "SELECT id_member, email, nama_member FROM member WHERE email = ?";
-          db.query(data, [body.email], async (err, result) => {
-            res.status(200).json({
-              authUser: { ...result[0], role: "user" },
-              message: "Success",
-            });
+      // res.status(200).json({
+      //   user: result[0],
+      // });
+      if (result[0]) {
+        const data =
+          "SELECT id_member, email, nama_member FROM member WHERE email = ?";
+        db.query(data, [body.email], async (err, result) => {
+          res.status(200).json({
+            authUser: { ...result[0], role: "user" },
+            message: "Success",
           });
-        }
-      });
-    } else {
-      const data =
-        "SELECT id_member, email, nama_member FROM member WHERE email = ?";
-      db.query(data, [body.email], async (err, result) => {
-        res.status(200).json({
-          authUser: { ...result[0], role: "user" },
-          message: "Success",
         });
-      });
-    }
+      } else {
+        const query =
+          "INSERT INTO member (nama_member, email,foto_profil) VALUES (?,?,?)";
+        db.query(query, [body.name, body.email, body.image], (err, result) => {
+          if (result[0]) {
+            const data =
+              "SELECT id_member, email, nama_member FROM member WHERE email = ?";
+            db.query(data, [body.email], async (err, result) => {
+              res.status(200).json({
+                authUser: { ...result[0], role: "user" },
+                message: "Success",
+              });
+            });
+          }
+        });
+      }
+    });
   } catch {
     res.status(500).send();
   }
@@ -309,8 +329,24 @@ app.put("/api/auth/change-password", async (req, res) => {
     const hash = await bcrypt.hash(password, salt);
 
     const query =
-      "UPDATE SET member password = ? WHERE id_member = '" + id + "'";
+      "UPDATE member SET password = ? WHERE id_member = '" + id + "'";
     db.query(query, hash, (err, result) => {
+      res.send(result);
+    });
+  } catch {
+    res.status(500).send();
+  }
+});
+
+app.put("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { password, email } = req.body;
+    // generate salt to hash password
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+
+    const query = "UPDATE member SET password = ? WHERE email = ?";
+    db.query(query, [hash, email], (err, result) => {
       res.send(result);
     });
   } catch {
@@ -325,7 +361,23 @@ app.put("/api/auth/admin/change-password", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    const query = "UPDATE SET admin password = ? WHERE id_admin = '" + id + "'";
+    const query = "UPDATE admin SET password = ? WHERE id_admin = '" + id + "'";
+    db.query(query, hash, (err, result) => {
+      res.send(result);
+    });
+  } catch {
+    res.status(500).send();
+  }
+});
+
+app.put("/api/auth/admin/forgot-password", async (req, res) => {
+  try {
+    const { password, email } = req.body;
+    // generate salt to hash password
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+
+    const query = "UPDATE admin SET password = ? WHERE email = '" + email + "'";
     db.query(query, hash, (err, result) => {
       res.send(result);
     });
@@ -346,15 +398,25 @@ app.post("/api/auth/admin/register", async (req, res) => {
         res.send(result);
       });
     }
+    const checkUser = "SELECT * FROM member WHERE email = ?";
+    db.query(checkUser, body.email, async (err, result) => {
+      try {
+        if (result[0]) {
+          // generate salt to hash password
+          const salt = await bcrypt.genSalt();
+          const hash = await bcrypt.hash(body.password, salt);
 
-    // generate salt to hash password
-    const salt = await bcrypt.genSalt();
-    const hash = await bcrypt.hash(body.password, salt);
-
-    const query =
-      "INSERT INTO admin (nama_admin, email, password) VALUES (?,?,?)";
-    db.query(query, [body.name, body.email, hash], (err, result) => {
-      res.send(result);
+          const query =
+            "INSERT INTO admin (nama_admin, email, password) VALUES (?,?,?)";
+          db.query(query, [body.name, body.email, hash], (err, result) => {
+            res.send(result);
+          });
+        } else {
+          res.status(409).json({ message: "Admin already exist" });
+        }
+      } catch {
+        res.status(409).json({ message: "Admin already exist" });
+      }
     });
   } catch {
     res.status(500).send();
