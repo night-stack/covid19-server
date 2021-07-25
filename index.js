@@ -252,7 +252,7 @@ app.post("/api/auth/register", async (req, res) => {
     }
     const checkUser = "SELECT * FROM member WHERE email = ?";
     db.query(checkUser, body.email, async (err, result) => {
-      if (result) {
+      if (result[0]) {
         res.status(409).json({ message: "User already exist" });
       } else {
         // generate salt to hash password
@@ -396,7 +396,7 @@ app.post("/api/auth/admin/register", async (req, res) => {
     }
     const checkUser = "SELECT * FROM admin WHERE email = ?";
     db.query(checkUser, body.email, async (err, result) => {
-      if (result) {
+      if (result[0]) {
         res.status(409).json({ message: "Admin already exist" });
       } else {
         // generate salt to hash password
