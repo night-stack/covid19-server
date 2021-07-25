@@ -252,20 +252,16 @@ app.post("/api/auth/register", async (req, res) => {
     }
     const checkUser = "SELECT * FROM member WHERE email = ?";
     db.query(checkUser, body.email, async (err, result) => {
-      try {
-        if (result[0]) {
-          // generate salt to hash password
-          const hash = await bcrypt.hash(body.password, 10);
-          const query =
-            "INSERT INTO member (nama_member, email, password) VALUES (?,?,?)";
-          db.query(query, [body.name, body.email, hash], (err, result) => {
-            res.send(result);
-          });
-        } else {
-          res.status(409).json({ message: "User already exist" });
-        }
-      } catch {
+      if (result) {
         res.status(409).json({ message: "User already exist" });
+      } else {
+        // generate salt to hash password
+        const hash = await bcrypt.hash(body.password, 10);
+        const query =
+          "INSERT INTO member (nama_member, email, password) VALUES (?,?,?)";
+        db.query(query, [body.name, body.email, hash], (err, result) => {
+          res.send(result);
+        });
       }
     });
   } catch {
@@ -398,24 +394,18 @@ app.post("/api/auth/admin/register", async (req, res) => {
         res.send(result);
       });
     }
-    const checkUser = "SELECT * FROM member WHERE email = ?";
+    const checkUser = "SELECT * FROM admin WHERE email = ?";
     db.query(checkUser, body.email, async (err, result) => {
-      try {
-        if (result[0]) {
-          // generate salt to hash password
-          const salt = await bcrypt.genSalt();
-          const hash = await bcrypt.hash(body.password, salt);
-
-          const query =
-            "INSERT INTO admin (nama_admin, email, password) VALUES (?,?,?)";
-          db.query(query, [body.name, body.email, hash], (err, result) => {
-            res.send(result);
-          });
-        } else {
-          res.status(409).json({ message: "Admin already exist" });
-        }
-      } catch {
+      if (result) {
         res.status(409).json({ message: "Admin already exist" });
+      } else {
+        // generate salt to hash password
+        const hash = await bcrypt.hash(body.password, 10);
+        const query =
+          "INSERT INTO admin (nama_admin, email, password) VALUES (?,?,?)";
+        db.query(query, [body.name, body.email, hash], (err, result) => {
+          res.send(result);
+        });
       }
     });
   } catch {
