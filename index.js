@@ -7,6 +7,7 @@ const bcrypt = require("bcrypt");
 const db = mysql.createPool({
   host: "localhost",
   user: "root",
+  password: "12345",
   database: "covid19",
   connectionLimit: 100,
 });
@@ -138,23 +139,27 @@ app.put("/api/history/edit/:id", (req, res) => {
 });
 
 app.post("/api/history/add", (req, res) => {
-  const { idMember, idDiagnosis, date, result, percent, status } = req.body;
+  const { id_member, diagnosa, date, id_diagnosis } = req.body;
 
   const query =
-    "INSERT INTO riwayat (tanggal_diagnosis, hasil_diagnosis, persentase_diagnosis, status_pasien, id_member, id_diagnosis) VALUES (?,?,?,?,?,?)";
-  db.query(
-    query,
-    [idMember, idDiagnosis, date, result, percent, status],
-    (err, result) => {
-      res.send(result);
-    }
-  );
+    "INSERT INTO riwayat (tanggal_diagnosis, diagnosa, id_member, id_diagnosis) VALUES (?,?,?,?)";
+  db.query(query, [date, diagnosa, id_member, id_diagnosis], (err, result) => {
+    res.send(result);
+  });
 });
 
 // api diagnosis
 app.get("/api/diagnosis", (req, res) => {
   const query = "SELECT * FROM diagnosis";
   db.query(query, (err, result) => {
+    res.send(result);
+  });
+});
+
+app.get("/api/diagnosis/:id", (req, res) => {
+  const id = req.params.id;
+  const query = "SELECT * FROM diagnosis WHERE id_diagnosis = ?";
+  db.query(query, id, (err, result) => {
     res.send(result);
   });
 });
@@ -180,11 +185,31 @@ app.put("/api/diagnosis/edit/:id", (req, res) => {
 });
 
 app.post("/api/diagnosis/add", (req, res) => {
-  const { question, result } = req.body;
+  const {
+    indikasi,
+    batuk,
+    demam,
+    sakitTenggorokan,
+    sesakNafas,
+    sakitKepala,
+    result,
+  } = req.body;
 
   const query =
-    "INSERT INTO diagnosis (pertanyaan, hasil_diagnosis) VALUES (?,?)";
-  db.query(query, [question, result], (err, result) => {
+    "INSERT INTO diagnosis (indikasi, batuk, demam, sakitTenggorokan, sesakNafas, sakitKepala, hasil_diagnosis) VALUES (?,?,?,?,?,?,?)";
+  db.query(
+    query,
+    [indikasi, batuk, demam, sakitTenggorokan, sesakNafas, sakitKepala, result],
+    (err, result) => {
+      res.send(result);
+    }
+  );
+});
+
+app.get("/api/diagnosis/id", (req, res) => {
+  const query =
+    "SELECT id_diagnosis FROM diagnosis ORDER BY id_diagnosis DESC LIMIT 1";
+  db.query(query, (err, result) => {
     res.send(result);
   });
 });
