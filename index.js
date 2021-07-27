@@ -206,7 +206,7 @@ app.post("/api/diagnosis/add", (req, res) => {
   );
 });
 
-app.get("/api/diagnosis/id", (req, res) => {
+app.get("/api/id", (req, res) => {
   const query =
     "SELECT id_diagnosis FROM diagnosis ORDER BY id_diagnosis DESC LIMIT 1";
   db.query(query, (err, result) => {
